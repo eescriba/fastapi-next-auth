@@ -4,6 +4,7 @@ import FacebookProvider from "next-auth/providers/facebook"
 import GithubProvider from "next-auth/providers/github"
 import GoogleProvider from "next-auth/providers/google"
 import TwitterProvider from "next-auth/providers/twitter"
+import axios from "axios"
 // import EmailProvider from "next-auth/providers/email"
 // import AppleProvider from "next-auth/providers/apple"
 
@@ -12,19 +13,7 @@ import TwitterProvider from "next-auth/providers/twitter"
 export default NextAuth({
   // https://next-auth.js.org/configuration/providers
   providers: [
-    // EmailProvider({
-    //   server: process.env.EMAIL_SERVER,
-    //   from: process.env.EMAIL_FROM,
-    // }),
-    // AppleProvider({
-    //   clientId: process.env.APPLE_ID,
-    //   clientSecret: {
-    //     appleId: process.env.APPLE_ID,
-    //     teamId: process.env.APPLE_TEAM_ID,
-    //     privateKey: process.env.APPLE_PRIVATE_KEY,
-    //     keyId: process.env.APPLE_KEY_ID,
-    //   },
-    // }),
+
     Auth0Provider({
       clientId: process.env.AUTH0_ID,
       clientSecret: process.env.AUTH0_SECRET,
@@ -110,10 +99,40 @@ export default NextAuth({
   // when an action is performed.
   // https://next-auth.js.org/configuration/callbacks
   callbacks: {
-    // async signIn({ user, account, profile, email, credentials }) { return true },
+    async signIn({ user, account, profile, email, credentials }) { 
+       if (account.provider === 'google') {
+        try {
+          const response = await axios.post(
+             'http://localhost/api/v1/login/google',
+            {
+              access_token: account.access_token,
+              id_token: account.id_token,
+            },
+          );
+          const { access_token } = response.data;
+          user.accessToken = access_token;
+          return true
+        } catch (error) {
+          return false;
+        }
+      }
+      return false;
+
+    },
     // async redirect({ url, baseUrl }) { return baseUrl },
     // async session({ session, token, user }) { return session },
-    // async jwt({ token, user, account, profile, isNewUser }) { return token }
+    async jwt({ token, user}) { 
+      if (user) {
+        const { accessToken } = user;
+        token = {
+          ...token,
+          accessToken
+        };
+        delete user.accessToken;
+        return token;
+      }
+      return token;
+    }
   },
 
   // Events are useful for logging
